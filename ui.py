@@ -69,14 +69,14 @@ class Window(QMainWindow):
         if files:
             mygroupbox = QGroupBox()
             myform = QHBoxLayout()
-            label_list = []
+            self.label_list = []
             for i, f in enumerate(files):
                 self.list_images.append(os.path.split(f)[1])
                 l = QLabel()
                 p = QPixmap(f)
                 p = p.scaledToHeight(75)
                 l.setPixmap(p)
-                label_list.append(l)
+                self.label_list.append(l)
                 myform.addWidget(l)
             self.new_image_order = [i for i in self.list_images]
 
@@ -110,6 +110,9 @@ class Window(QMainWindow):
     def order_changer(self, index):
         def set_order_index(image):
             self.new_image_order[index] = self.list_images[image]
+            new_p = QPixmap(os.path.join(self.image_dir, self.list_images[image]))
+            new_p = new_p.scaledToHeight(75)
+            self.label_list[index].setPixmap(new_p)
         return set_order_index
 
     def create_pdf(self):
