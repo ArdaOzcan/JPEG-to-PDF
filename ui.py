@@ -1,12 +1,13 @@
 from PyQt5.QtGui import QPixmap
 import sys
 from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QGridLayout, QPushButton, QFileDialog, QWidget, QLabel, QComboBox, QGroupBox, QScrollArea, QHBoxLayout, QLineEdit
-import converter
+import jpegtopdf
 import os
 
 
 class Theme:
     default_creation = False
+
     def __init__(self, source_file, fg_color="#BBBBBB", mid_color="#252525", bg_color="#151515"):
         self.fg_color = fg_color
         self.mid_color = mid_color
@@ -62,7 +63,7 @@ class Window(QMainWindow):
 
     def open_file_names_dialog(self):
         files, _ = QFileDialog.getOpenFileNames(
-            self, "QFileDialog.getOpenFileNames()", "", "JPEG Files (*.jpg; *.jpeg)")
+            self, "Choose files", "", "JPEG Files (*.jpg; *.jpeg)")
         self.list_images = []
         self.image_dir = os.path.split(files[0])[0]
 
@@ -72,8 +73,10 @@ class Window(QMainWindow):
             self.label_list = []
             for i, f in enumerate(files):
                 self.list_images.append(os.path.split(f)[1])
+                jpegtopdf.compress(self.image_dir, self.list_images[i])
                 l = QLabel()
-                p = QPixmap(f)
+                p = QPixmap(jpegtopdf.compressed_image_name(
+                    self.list_images[i]))
                 p = p.scaledToHeight(75)
                 l.setPixmap(p)
                 self.label_list.append(l)
@@ -110,13 +113,18 @@ class Window(QMainWindow):
     def order_changer(self, index):
         def set_order_index(image):
             self.new_image_order[index] = self.list_images[image]
-            new_p = QPixmap(os.path.join(self.image_dir, self.list_images[image]))
+            new_p = QPixmap(os.path.join(
+                self.image_dir, self.list_images[image]))
             new_p = new_p.scaledToHeight(75)
             self.label_list[index].setPixmap(new_p)
         return set_order_index
 
     def create_pdf(self):
-        converter.create_pdf(self.pdf_file_name_line_edit.text(),
+        pdf_file_name = self.pdf_file_name_line_edit.text()
+        if not pdf_file_name.endswith('.pdf'):
+            pdf_file_name += '.pdf'
+
+        jpegtopdf.create_pdf(pdf_file_name,
                              self.new_image_order, self.image_dir)
 
     def initiate_ui(self):
@@ -132,6 +140,10 @@ class Window(QMainWindow):
         self.w = QWidget()
         self.w.setLayout(self.layout)
         self.setCentralWidget(self.w)
+
+    def closeEvent(self, *args, **kwargs):
+        super(QMainWindow, self).closeEvent(*args, **kwargs)
+        jpegtopdf.temp_cleanup(self.list_images)
 
 
 if __name__ == "__main__":
