@@ -66,6 +66,7 @@ class Window(QMainWindow):
             self, "Choose files", "", "JPEG Files (*.jpg; *.jpeg)")
         self.list_images = []
         self.image_dir = os.path.split(files[0])[0]
+        jpegtopdf.check_temp_folder()
 
         if files:
             mygroupbox = QGroupBox()
