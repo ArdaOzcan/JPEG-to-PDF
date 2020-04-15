@@ -5,9 +5,15 @@ Simple python script to convert multiple or single JPEG images to .pdf files usi
 
 You can clone the repo using git:
 ```
-git clone https://github.com/ArdaOzcan/JPEG-to-PDF jpeg2pdf
+git clone https://github.com/ArdaOzcan/JPEG-to-PDF
 ```
 Or under the repository name, click **Clone or download** and then click **Download ZIP**.
+
+### Note
+After download, if you want to use the python file run:
+```
+pip install -r requirements.txt
+```
 
 ## Usage
 
