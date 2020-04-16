@@ -1,8 +1,29 @@
-from PyQt5.QtGui import QPixmap
-import sys
-from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QGridLayout, QPushButton, QFileDialog, QWidget, QLabel, QComboBox, QGroupBox, QScrollArea, QHBoxLayout, QLineEdit
+from PyQt5 import QtWidgets, QtGui, QtCore
 import jpegtopdf
 import os
+import datetime
+import subprocess
+import sys
+import platform
+
+
+def open_document(filepath):
+    if platform.system() == "Windows":
+        filepath = filepath.replace('/', '\\')
+        print(filepath)
+        subprocess.Popen(f'explorer /select,{filepath}') 
+
+
+class LabelWidgetCouple(QtWidgets.QHBoxLayout):
+
+    def __init__(self, label_text, widget):
+        super().__init__()
+
+        self.label = QtWidgets.QLabel(label_text)
+        self.addWidget(self.label)
+
+        self.widget = widget
+        self.addWidget(self.widget)
 
 
 class Theme:
@@ -29,126 +50,179 @@ class Theme:
         return t
 
 
-class InfoDialog(QDialog):
-    def __init__(self, parent, title, message, theme):
-        super().__init__(parent)
-        self.setStyleSheet(
-            f'background:{theme.bg_color}; color:{theme.fg_color}')
-        self.setWindowTitle(title)
-        self.layout = QGridLayout()
-        self.layout.addWidget(QLabel(message))
-        self.ok_button = QPushButton('OK')
-        self.ok_button.pressed.connect(self.accept)
-        self.layout.addWidget(self.ok_button)
-        self.setLayout(self.layout)
-        self.show()
-
-
-class Window(QMainWindow):
-    def __init__(self, theme, title='window'):
+class Window(QtWidgets.QMainWindow):
+    def __init__(self, title, theme):
         super().__init__()
         self.theme = theme
-        if self.theme.default_creation:
-            dlg = InfoDialog(self, 'INFO',
-                             f'Theme file you provided "{theme.source_file}" not found.\nContinuing with the default theme', self.theme)
-            dlg.exec_()
+        self.action_index = 0
+        self.setGeometry(0, 0, 850, 500)
 
-        self.setStyleSheet(
-            f'background:{self.theme.bg_color}; color:{self.theme.fg_color}')
+        self.setMinimumWidth(650)
+        self.setMinimumHeight(400)
 
         self.setWindowTitle(title)
+        self.setStyleSheet(
+            f'background:{theme.bg_color}; color:{theme.fg_color}')
         self.initiate_ui()
-
         self.show()
+        self.log('PROGRAM STARTED SUCCESSFULLY')
 
-    def open_file_names_dialog(self):
-        files, _ = QFileDialog.getOpenFileNames(
-            self, "Choose files", "", "JPEG Files (*.jpg; *.jpeg)")
-        self.list_images = []
-        self.image_dir = os.path.split(files[0])[0]
-        jpegtopdf.check_temp_folder()
+    def initiate_ui(self):
+        # Main Layout
+        self.layout = QtWidgets.QGridLayout()
 
-        if files:
-            mygroupbox = QGroupBox()
-            myform = QHBoxLayout()
-            self.label_list = []
-            for i, f in enumerate(files):
-                self.list_images.append(os.path.split(f)[1])
-                jpegtopdf.compress(self.image_dir, self.list_images[i])
-                l = QLabel()
-                p = QPixmap(jpegtopdf.compressed_image_name(
-                    self.list_images[i]))
-                p = p.scaledToHeight(75)
-                l.setPixmap(p)
-                self.label_list.append(l)
-                myform.addWidget(l)
-            self.new_image_order = [i for i in self.list_images]
+        # Top bar
+        self.top_bar = QtWidgets.QFrame()
+        self.top_bar.setStyleSheet(f'background:{self.theme.mid_color}')
+        self.top_bar.setFixedHeight(75)
+        self.layout.addWidget(self.top_bar, 0, 0)
 
-            for i in range(len(self.list_images)):
-                cb = QComboBox()
-                cb.addItems(self.list_images)
-                cb.setCurrentIndex(i)
-                set_order_func = self.order_changer(i)
-                cb.currentIndexChanged.connect(set_order_func)
-                self.layout.addWidget(cb, i + 2, 0)
+        self.top_bar_layout = QtWidgets.QGridLayout(self.top_bar)
+        self.top_bar_layout.setColumnStretch(2, 4)
 
-            mygroupbox.setLayout(myform)
-            scroll = QScrollArea()
-            scroll.setWidget(mygroupbox)
-            scroll.setWidgetResizable(True)
-            scroll.setFixedHeight(100)
-            self.layout.addWidget(scroll, 1, 0)
-            self.pdf_file_name_horiztonal = QHBoxLayout()
-            self.pdf_file_name_horiztonal.addWidget(QLabel('PDF File Name: '))
-            self.pdf_file_name_line_edit = QLineEdit()
-            self.pdf_file_name_line_edit.setStyleSheet(
-                f'background:{self.theme.mid_color}')
-            self.pdf_file_name_horiztonal.addWidget(
-                self.pdf_file_name_line_edit)
-            self.setFixedWidth(400)
+        title_font = QtGui.QFont()
+        title_font.setBold(True)
+        title_font.setPointSize(25)
+        self.title_label = QtWidgets.QLabel('JPEG-to-PDF')
+        self.title_label.setFont(title_font)
 
-            self.layout.addLayout(
-                self.pdf_file_name_horiztonal, len(self.list_images) + 3, 0)
-            self.layout.addWidget(self.create_button)
+        by_font = QtGui.QFont()
+        by_font.setBold(True)
+        by_font.setPointSize(12)
+        self.by_label = QtWidgets.QLabel('by Arda Özcan')
+        self.by_label.setFont(by_font)
+
+        self.top_bar_layout.addWidget(self.title_label, 0, 3)
+        self.top_bar_layout.addWidget(self.by_label, 1, 3)
+
+        self.open_files_button = QtWidgets.QPushButton('Open File...')
+        self.open_files_button.pressed.connect(self.open_file_names_dialog)
+        self.top_bar_layout.addWidget(self.open_files_button, 0, 0)
+
+        self.save_button = QtWidgets.QPushButton('Save')
+        self.save_button.pressed.connect(self.create_pdf)
+        self.top_bar_layout.addWidget(self.save_button, 1, 0)
+
+        # Compression amount
+        self.quality_input = LabelWidgetCouple(
+            'JPEG Quality: ', QtWidgets.QLineEdit('85'))
+        self.quality_input.widget.setValidator(QtGui.QIntValidator())
+        self.top_bar_layout.addLayout(self.quality_input, 0, 1)
+
+        self.bottom_bar = QtWidgets.QFrame()
+        self.bottom_bar.setStyleSheet(f'background:{self.theme.bg_color}')
+        self.layout.addWidget(self.bottom_bar, 1, 0)
+
+        self.bottom_bar_layout = QtWidgets.QGridLayout(self.bottom_bar)
+        self.bottom_bar_right_layout = QtWidgets.QGridLayout()
+
+        self.combo_box_layout = QtWidgets.QVBoxLayout()
+
+        self.log_console = QtWidgets.QTextEdit()
+        self.log_console.setStyleSheet(f'background:{self.theme.mid_color}')
+        self.log_console.setFocusPolicy(QtCore.Qt.NoFocus)
+
+        self.bottom_bar_right_layout.addWidget(self.log_console, 1, 0)
+        self.bottom_bar_right_layout.addLayout(self.combo_box_layout, 0, 0)
+
+        self.bottom_bar_layout.addLayout(self.bottom_bar_right_layout, 0, 1)
+
+        self.scroll = QtWidgets.QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFixedWidth(200)
+        self.bottom_bar_layout.addWidget(self.scroll, 0, 0)
+
+        self.w = QtWidgets.QWidget()
+        self.setCentralWidget(self.w)
+        self.w.setLayout(self.layout)
 
     def order_changer(self, index):
         def set_order_index(image):
             self.new_image_order[index] = self.list_images[image]
-            new_p = QPixmap(os.path.join(
+            new_p = QtGui.QPixmap(os.path.join(
                 self.image_dir, self.list_images[image]))
-            new_p = new_p.scaledToHeight(75)
+            new_p = new_p.scaledToWidth(155)
             self.label_list[index].setPixmap(new_p)
         return set_order_index
 
+    def open_file_names_dialog(self):
+        files, _ = QtWidgets.QFileDialog.getOpenFileNames(
+            self, "Choose files", "", "JPEG Files (*.jpg; *.jpeg)")
+
+        if not files:
+            return
+
+        self.list_images = []
+        self.image_dir = os.path.split(files[0])[0]
+        #jpegtopdf.check_temp_folder(self.log)
+
+        mygroupbox = QtWidgets.QGroupBox()
+        myform = QtWidgets.QVBoxLayout()
+        self.label_list = []
+        for i, f in enumerate(files):
+            self.list_images.append(os.path.split(f)[1])
+            jpegtopdf.compress(self.image_dir, self.list_images[i])
+            l = QtWidgets.QLabel()
+            p = QtGui.QPixmap(jpegtopdf.compressed_image_name(
+                self.list_images[i]))
+            p = p.scaledToWidth(155)
+            l.setPixmap(p)
+            self.label_list.append(l)
+            myform.addWidget(l)
+
+        self.new_image_order = [i for i in self.list_images]
+
+        for i in reversed(range(self.combo_box_layout.count())):
+            self.combo_box_layout.itemAt(i).widget().setParent(None)
+
+        for i in range(len(self.list_images)):
+            cb = QtWidgets.QComboBox()
+            cb.addItems(self.list_images)
+            cb.setCurrentIndex(i)
+            set_order_func = self.order_changer(i)
+            cb.currentIndexChanged.connect(set_order_func)
+            self.combo_box_layout.addWidget(cb)
+
+        mygroupbox.setLayout(myform)
+        self.scroll.setWidget(mygroupbox)
+
+    def log(self, msg):
+        date = str(datetime.datetime.now()).split('.')[0]
+        prompt = f'[{"{:05d}".format(self.action_index)}][{date}]: '
+        self.log_console.append(f'<b>{prompt}</b> <h>{msg}</h>')
+        self.action_index += 1
+
     def create_pdf(self):
-        pdf_file_name = self.pdf_file_name_line_edit.text()
+        pdf_file_name, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save file", "", "PDF File (*.pdf)")
+
+        if not pdf_file_name:
+            return
+
         if not pdf_file_name.endswith('.pdf'):
             pdf_file_name += '.pdf'
 
-        jpegtopdf.create_pdf(pdf_file_name,
-                             self.new_image_order, self.image_dir)
+        try:
+            quality = int(self.quality_input.widget.text())
+        except ValueError:
+            quality = 85
 
-    def initiate_ui(self):
-        self.layout = QGridLayout()
+        jpegtopdf.create_pdf(pdf_file_name, self.new_image_order,
+                             quality=quality, im_dir=self.image_dir, log_func=self.log)
 
-        self.choose_file_button = QPushButton('Choose files')
-        self.choose_file_button.clicked.connect(self.open_file_names_dialog)
-        self.layout.addWidget(self.choose_file_button, 0, 0)
+        if platform.system() == "Windows":
+            buttons = QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Yes
+            msg = QtWidgets.QMessageBox.question(
+                self, 'JPEG-to-PDF', 'Do you want to open the exported file in the explorer?', buttons,
+                QtWidgets.QMessageBox.No)
 
-        self.create_button = QPushButton('Create')
-        self.create_button.clicked.connect(self.create_pdf)
-
-        self.w = QWidget()
-        self.w.setLayout(self.layout)
-        self.setCentralWidget(self.w)
-
-    def closeEvent(self, *args, **kwargs):
-        super(QMainWindow, self).closeEvent(*args, **kwargs)
-        jpegtopdf.temp_cleanup(self.list_images)
+            if msg == QtWidgets.QMessageBox.Yes:
+                open_document(pdf_file_name)
 
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
+if __name__ == '__main__':
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
     app.setStyle('Fusion')
-    win = Window(Theme.load_from_json('theme.json'), 'JPEG to PDF')
+    w = Window('JPEG-to-PDF', Theme('theme.json'))
     sys.exit(app.exec_())
