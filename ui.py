@@ -10,8 +10,7 @@ import platform
 def open_document(filepath):
     if platform.system() == "Windows":
         filepath = filepath.replace('/', '\\')
-        print(filepath)
-        subprocess.Popen(f'explorer /select,{filepath}') 
+        subprocess.Popen(f'explorer /select,{filepath}')
 
 
 class LabelWidgetCouple(QtWidgets.QHBoxLayout):
@@ -66,6 +65,8 @@ class Window(QtWidgets.QMainWindow):
         self.initiate_ui()
         self.show()
         self.log('PROGRAM STARTED SUCCESSFULLY')
+
+        self.temp_files = set()
 
     def initiate_ui(self):
         # Main Layout
@@ -154,17 +155,19 @@ class Window(QtWidgets.QMainWindow):
 
         self.list_images = []
         self.image_dir = os.path.split(files[0])[0]
-        #jpegtopdf.check_temp_folder(self.log)
 
         mygroupbox = QtWidgets.QGroupBox()
         myform = QtWidgets.QVBoxLayout()
         self.label_list = []
         for i, f in enumerate(files):
             self.list_images.append(os.path.split(f)[1])
-            jpegtopdf.compress(self.image_dir, self.list_images[i])
+            jpegtopdf.compress(
+                self.image_dir, self.list_images[i], self.get_quality_input())
+            self.temp_files.add(jpegtopdf.compressed_image_name(
+                self.list_images[i], self.get_quality_input()))
             l = QtWidgets.QLabel()
             p = QtGui.QPixmap(jpegtopdf.compressed_image_name(
-                self.list_images[i]))
+                self.list_images[i], self.get_quality_input()))
             p = p.scaledToWidth(155)
             l.setPixmap(p)
             self.label_list.append(l)
@@ -192,6 +195,14 @@ class Window(QtWidgets.QMainWindow):
         self.log_console.append(f'<b>{prompt}</b> <h>{msg}</h>')
         self.action_index += 1
 
+    def get_quality_input(self):
+        try:
+            quality = int(self.quality_input.widget.text())
+        except ValueError:
+            quality = 85
+
+        return quality
+
     def create_pdf(self):
         pdf_file_name, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, "Save file", "", "PDF File (*.pdf)")
@@ -202,13 +213,10 @@ class Window(QtWidgets.QMainWindow):
         if not pdf_file_name.endswith('.pdf'):
             pdf_file_name += '.pdf'
 
-        try:
-            quality = int(self.quality_input.widget.text())
-        except ValueError:
-            quality = 85
+        additional_temps = jpegtopdf.create_pdf(pdf_file_name, self.new_image_order,
+                                                quality=self.get_quality_input(), im_dir=self.image_dir, log_func=self.log)
 
-        jpegtopdf.create_pdf(pdf_file_name, self.new_image_order,
-                             quality=quality, im_dir=self.image_dir, log_func=self.log)
+        self.temp_files = self.temp_files.union(additional_temps)
 
         if platform.system() == "Windows":
             buttons = QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Yes
@@ -218,6 +226,10 @@ class Window(QtWidgets.QMainWindow):
 
             if msg == QtWidgets.QMessageBox.Yes:
                 open_document(pdf_file_name)
+
+    def closeEvent(self, *args, **kwargs):
+        super(QtWidgets.QMainWindow, self).closeEvent(*args, **kwargs)
+        jpegtopdf.temp_cleanup(self.temp_files, self.log)
 
 
 if __name__ == '__main__':

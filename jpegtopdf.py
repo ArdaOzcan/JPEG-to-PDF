@@ -20,8 +20,8 @@ def log(msg):
     action_index += 1
 
 
-def compressed_image_name(old_name):
-    return os.path.join(tempfile.gettempdir(), f"CMP_{os.path.basename(old_name)}")
+def compressed_image_name(old_name, quality):
+    return os.path.join(tempfile.gettempdir(), f"CMP_{str(quality)}_{os.path.basename(old_name)}")
 
 
 def open_with_correct_rotation(im_dir, fp):
@@ -42,30 +42,32 @@ def open_with_correct_rotation(im_dir, fp):
     return picture
 
 
-def compress(im_dir, file, quality=85):
+def compress(im_dir, file, log_func, quality=85):
     picture = open_with_correct_rotation(im_dir, file)
-    picture.save(compressed_image_name(file),
+    picture.save(compressed_image_name(file, quality),
                  'JPEG', optimize=True, quality=quality)
+    log_func(f'COMPRESSED {os.path.join(im_dir, file)}')
 
 
-def temp_cleanup(list_images, log_func):
-    for page in list_images:
-        os.remove(compressed_image_name(page))
-        log_func(f'REMOVING {compressed_image_name(str(page))}')
+def temp_cleanup(temp_list, log_func):
+    for file in temp_list:
+        os.remove(file)
+        log_func(f'REMOVING {file}')
 
 
 def create_pdf(pdf_file_path, list_images, quality=85, im_dir='', log_func=log):
 
+    temp_files = set()
     if not pdf_file_path.endswith('.pdf'):
         pdf_file_path += '.pdf'
 
     try:
-        with Image.open(compressed_image_name(str(list_images[0]))) as cover:
+        with Image.open(compressed_image_name(str(list_images[0]), quality)) as cover:
             width, height = cover.size
     except FileNotFoundError:
         compress(im_dir, list_images[0], quality=quality)
-        log_func(f'COMPRESSING {list_images[0]}')
-        with Image.open(compressed_image_name(str(list_images[0]))) as cover:
+        temp_files.add(compressed_image_name(list_images[0], quality))
+        with Image.open(compressed_image_name(str(list_images[0]), quality)) as cover:
             width, height = cover.size
 
     pdf = FPDF(unit="pt", format=[width, height])
@@ -74,16 +76,18 @@ def create_pdf(pdf_file_path, list_images, quality=85, im_dir='', log_func=log):
         pdf.add_page()
 
         try:
-            pdf.image(compressed_image_name(str(page)), 0, 0)
+            pdf.image(compressed_image_name(str(page), quality), 0, 0)
         except RuntimeError:
             compress(im_dir, page, quality=quality)
-            log_func(f'COMPRESSING {page}')
-            pdf.image(compressed_image_name(str(page)), 0, 0)
+            temp_files.add(compressed_image_name(page, quality))
 
-        log_func(f'ADDING {compressed_image_name(str(page))}')
+            pdf.image(compressed_image_name(str(page), quality), 0, 0)
+
+        log_func(f'ADDING {compressed_image_name(str(page), quality)}')
 
     pdf.output(pdf_file_path, 'F')
     log_func(f'EXPORTING TO {pdf_file_path}')
+    return temp_files
 
 
 if __name__ == '__main__':
@@ -93,7 +97,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--images_dir_path')
     parser.add_argument('-l', '--image_list', nargs='+', required=True)
     parser.add_argument('-v', '--verbose', action='store_true', default=False)
-    parser.add_argument('-q', '--quality', action='store', type=int, default=85)
+    parser.add_argument('-q', '--quality', action='store',
+                        type=int, default=85)
 
     args = parser.parse_args()
     if args.images_dir_path is None:
@@ -101,8 +106,8 @@ if __name__ == '__main__':
 
     verbose = args.verbose
     print(args.quality)
-    create_pdf(os.path.join(os.getcwd(), args.pdf_file_name), args.image_list,
-               quality=args.quality, im_dir=args.images_dir_path,
-               log_func=log)
+    temps = create_pdf(os.path.join(os.getcwd(), args.pdf_file_name), args.image_list,
+                       quality=args.quality, im_dir=args.images_dir_path,
+                       log_func=log)
     # If called by command-line, cleanup here. If using UI, cleanup is done in closeEvent()
-    temp_cleanup(args.image_list, log)
+    temp_cleanup(temps, log)
