@@ -162,7 +162,8 @@ class Window(QtWidgets.QMainWindow):
         for i, f in enumerate(files):
             self.list_images.append(os.path.split(f)[1])
             jpegtopdf.compress(
-                self.image_dir, self.list_images[i], self.get_quality_input())
+                self.image_dir, self.list_images[i], self.log,
+                self.get_quality_input())
             self.temp_files.add(jpegtopdf.compressed_image_name(
                 self.list_images[i], self.get_quality_input()))
             l = QtWidgets.QLabel()
