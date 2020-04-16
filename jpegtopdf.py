@@ -65,7 +65,7 @@ def create_pdf(pdf_file_path, list_images, quality=85, im_dir='', log_func=log):
         with Image.open(compressed_image_name(str(list_images[0]), quality)) as cover:
             width, height = cover.size
     except FileNotFoundError:
-        compress(im_dir, list_images[0], quality=quality)
+        compress(im_dir, list_images[0], log_func, quality=quality)
         temp_files.add(compressed_image_name(list_images[0], quality))
         with Image.open(compressed_image_name(str(list_images[0]), quality)) as cover:
             width, height = cover.size
@@ -78,7 +78,7 @@ def create_pdf(pdf_file_path, list_images, quality=85, im_dir='', log_func=log):
         try:
             pdf.image(compressed_image_name(str(page), quality), 0, 0)
         except RuntimeError:
-            compress(im_dir, page, quality=quality)
+            compress(im_dir, page, log_func, quality=quality)
             temp_files.add(compressed_image_name(page, quality))
 
             pdf.image(compressed_image_name(str(page), quality), 0, 0)
