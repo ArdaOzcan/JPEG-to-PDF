@@ -9,8 +9,7 @@ git clone https://github.com/ArdaOzcan/JPEG-to-PDF
 ```
 Or under the repository name, click **Clone or download** and then click **Download ZIP**.
 
-### Note
-After download, if you want to use the python file run:
+**Note:** After download, if you want to use the python file run:
 ```
 pip install -r requirements.txt
 ```
@@ -28,7 +27,7 @@ Usage of jpegtopdf.py is simple, you can see all the options by writing:
 ```
 D:\\Users\\user\\JPEG-to-PDF>.\jpegtopdf.py -h
 usage: jpegtopdf.py [-h] [-d IMAGES_DIR_PATH] -l IMAGE_LIST [IMAGE_LIST ...]
-                    [-v]
+                    [-v] [-q QUALITY]
                     pdf_file_name
 
 positional arguments:
@@ -39,6 +38,7 @@ optional arguments:
   -d IMAGES_DIR_PATH, --images_dir_path IMAGES_DIR_PATH
   -l IMAGE_LIST [IMAGE_LIST ...], --image_list IMAGE_LIST [IMAGE_LIST ...]
   -v, --verbose
+  -q QUALITY, --quality QUALITY
 
 ```
 
